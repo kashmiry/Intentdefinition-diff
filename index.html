@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A tool for iOS developers to compare and update translations in intentdefinition files created in Xcode">
+    <meta name="keywords" content="iOS, Xcode, intentdefinition, translation, localization, SiriKit, Intents, compare">
+    <title>Intentdefinition String Diff</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #7b2cbf;
+            --primary-light: #9d4edd;
+            --primary-dark: #5a189a;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #f8961e;
+            --light: #f8f9fa;
+            --dark: #240046;
+            --gray: #6c757d;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fcfaff 0%, #ffffff 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: var(--dark);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+        }
+
+        .app_header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .app_title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 10px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .app_title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .app_description {
+            color: var(--gray);
+            font-size: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .input_section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        @media (max-width: 768px) {
+            .input_section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input_group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input_label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            color: var(--primary-dark);
+        }
+
+        .input_label i {
+            margin-right: 8px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 180px;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border: 1px solid #e0e0e0;
+            font-size: 14px;
+            resize: none;
+            transition: var(--transition);
+            font-family: 'Consolas', monospace;
+            line-height: 1.5;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(123, 44, 191, 0.15);
+        }
+
+        .action_section {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .compare_btn {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--border-radius);
+            background: linear-gradient(to right, var(--primary), var(--primary-light));
+            color: white;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(123, 44, 191, 0.3);
+        }
+
+        .compare_btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(123, 44, 191, 0.4);
+        }
+
+        .compare_btn:active {
+            transform: translateY(0);
+        }
+
+        .compare_btn i {
+            margin-right: 8px;
+        }
+
+        .result_section {
+            margin-top: 20px;
+        }
+
+        .result_header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            color: var(--primary-dark);
+        }
+
+        .result_header i {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+
+        .result_container {
+            position: relative;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        #output {
+            width: 100%;
+            min-height: 180px;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border: 1px solid #e0e0e0;
+            font-size: 14px;
+            background: #f8f9fa;
+            white-space: pre-wrap;
+            overflow: auto;
+            font-family: 'Consolas', monospace;
+            line-height: 1.5;
+            color: var(--dark);
+            transition: var(--transition);
+        }
+
+        .copy_btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            opacity: 0.7;
+            transition: var(--transition);
+        }
+
+        .copy_btn:hover {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        .highlight {
+            background-color: rgba(247, 37, 133, 0.1);
+            border-left: 3px solid var(--danger);
+            padding-left: 10px;
+            margin: 5px 0;
+        }
+
+        .added {
+            background-color: rgba(76, 201, 240, 0.1);
+            border-left: 3px solid var(--success);
+            padding-left: 10px;
+            margin: 5px 0;
+        }
+
+        .section_header {
+            font-weight: 600;
+            margin: 10px 0;
+            padding: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .count_badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-light);
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .loader {
+            display: none;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .copy_btn:hover .tooltip {
+            opacity: 1;
+        }
+
+        .info_section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 14px;
+            color: var(--gray);
+        }
+
+        .info_section h4 {
+            color: var(--primary-dark);
+            margin-bottom: 10px;
+        }
+
+        .info_section p {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .info_section ul, .info_section ol {
+            padding-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .info_section li {
+            margin-bottom: 5px;
+        }
+
+        .github_link {
+            display: inline-flex;
+            align-items: center;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .github_link i {
+            margin-right: 5px;
+        }
+
+        .github_link:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: var(--gray);
+        }
+    </style>
+</head>
+<body>
+    <div class="container fade-in">
+        <div class="app_header">
+            <h1 class="app_title">Intentdefinition String Diff</h1>
+        </div>
+
+        <div class="input_section">
+            <div class="input_group">
+                <label class="input_label" for="text1"><i class="fas fa-file-alt"></i> Original Intent Strings</label>
+                <textarea id="text1" placeholder='Paste original intent strings here (e.g. "2FMKol" = "label";)...'></textarea>
+            </div>
+
+            <div class="input_group">
+                <label class="input_label" for="text2"><i class="fas fa-file-alt"></i> New Intent Strings</label>
+                <textarea id="text2" placeholder='Paste new intent strings here e.g. "2FMKol" = "label";...'></textarea>
+            </div>
+        </div>
+
+        <div class="action_section">
+            <button id="compareBtn" class="compare_btn" onclick="compareTexts()">
+                <i class="fas fa-exchange-alt"></i>
+                <span>Compare</span>
+                <div class="loader" id="loader"></div>
+            </button>
+        </div>
+
+        <div class="result_section">
+            <div class="result_header">
+                <i class="fas fa-list-ul"></i>
+                <h3>Differences Found</h3>
+            </div>
+
+            <div class="result_container">
+                <pre id="output">Results will appear here after comparison...</pre>
+                <button class="copy_btn" id="copyBtn" title="Copy to clipboard">
+                    <i class="fas fa-copy"></i>
+                    <span class="tooltip">Copy to clipboard</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="info_section">
+            <h4>About This Tool</h4>
+            <p>This tool compares & extracts differences in Xcode intentdefinition string files. Quickly identify missing or added strings without manually translating the whole file again. Essential for iOS developers maintaining localized SiriKit intents.</p>
+
+            <h4>How to Use</h4>
+            <ol>
+                <li>Paste your original intent strings from your existing intentdefinition file in the left textarea.</li>
+                <li>Paste your new or updated intent strings in the right textarea.</li>
+                <li>Click "Compare Intent Strings" to see what's missing or added.</li>
+                <li>Copy the results to update your translation files without redoing the entire file.</li>
+            </ol>
+
+            <a href="https://github.com/kashmiry/Intentdefinition-diff" class="github_link" target="_blank"><i class="fab fa-github"></i> GitHub repository</a>
+        </div>
+    </div>
+
+    <script>
+        //extract lines from text and create a map with keys and values
+        function extractLines(text) {
+            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+            const map = new Map();
+            lines.forEach(line => {
+                const match = line.match(/^"(.*?)"/);
+                if (match) {
+                    map.set(match[1], line); // Store the full line using the key
+                }
+            });
+            return map;
+        }
+
+        //store the results globally for copy function
+        let missingInText2 = [];
+        let missingInText1 = [];
+
+        //compare the two texts and show differences
+        function compareTexts() {
+            // Show loading animation
+            const compareBtn = document.getElementById('compareBtn');
+            const loader = document.getElementById('loader');
+            const btnText = compareBtn.querySelector('span');
+            const btnIcon = compareBtn.querySelector('i');
+
+            btnText.style.display = 'none';
+            btnIcon.style.display = 'none';
+            loader.style.display = 'block';
+
+            // Simulate processing delay for better UX
+            setTimeout(() => {
+                const map1 = extractLines(document.getElementById('text1').value);
+                const map2 = extractLines(document.getElementById('text2').value);
+
+                missingInText2 = Array.from(map1.keys()).filter(key => !map2.has(key)).map(key => map1.get(key));
+                missingInText1 = Array.from(map2.keys()).filter(key => !map1.has(key)).map(key => map2.get(key));
+
+                let output = "";
+
+                if (missingInText2.length > 0) {
+                    output += `<div class="section_header">🔴 Missing in New Translation <span class="count_badge">${missingInText2.length}</span></div>`;
+                    output += missingInText2.map(line => `<div class="highlight">${line}</div>`).join("") + "\n\n";
+                }
+
+                if (missingInText1.length > 0) {
+                    output += `<div class="section_header">🟢 Added in New Translation <span class="count_badge">${missingInText1.length}</span></div>`;
+                    output += missingInText1.map(line => `<div class="added">${line}</div>`).join("") + "\n\n";
+                }
+
+                const outputElement = document.getElementById('output');
+                outputElement.innerHTML = output || "✅ No differences found. Both translations match!";
+
+                // Add animation to the results
+                outputElement.classList.add('fade-in');
+                setTimeout(() => {
+                    outputElement.classList.remove('fade-in');
+                }, 500);
+
+                // Reset button state
+                btnText.style.display = 'block';
+                btnIcon.style.display = 'block';
+                loader.style.display = 'none';
+
+            }, 800); // Simulate processing time
+        }
+
+        //extract raw text from HTML content
+        function extractRawLines(lines) {
+            return lines.map(line => {
+                // Clean up any HTML tags and extra spaces
+                return line.replace(/<[^>]*>/g, '').trim();
+            });
+        }
+
+        //format lines with proper line breaks
+        function formatLines(lines) {
+            return lines.join('\n');
+        }
+
+        //copy with visual feedback
+        function copyWithFeedback(button, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalIcon = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    button.innerHTML = originalIcon;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                button.classList.add('shake');
+                setTimeout(() => {
+                    button.classList.remove('shake');
+                }, 500);
+            });
+        }
+
+        //copy raw lines (just the text content)
+        document.getElementById('copyBtn').addEventListener('click', function() {
+            const allLines = [...missingInText2, ...missingInText1];
+            const rawLines = extractRawLines(allLines);
+            const formattedText = formatLines(rawLines);
+            copyWithFeedback(this, formattedText);
+        });
+
+        //add event listeners for textarea focus effects
+        const textareas = document.querySelectorAll('textarea');
+        textareas.forEach(textarea => {
+            textarea.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'translateY(-2px)';
+            });
+
+            textarea.addEventListener('blur', function() {
+                this.parentElement.style.transform = 'translateY(0)';
+            });
+        });
+    </script>
+</body>
+</html>
